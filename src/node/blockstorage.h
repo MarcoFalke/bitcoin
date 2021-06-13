@@ -110,4 +110,7 @@ FlatFilePos SaveBlockToDisk(const CBlock& block, int nHeight, CChain& active_cha
 
 void ThreadImport(ChainstateManager& chainman, std::vector<fs::path> vImportFiles, const ArgsManager& args);
 
+/** Global variable that points to the active block tree (protected by cs_main) */
+extern std::unique_ptr<CBlockTreeDB> pblocktree;
+
 #endif // BITCOIN_NODE_BLOCKSTORAGE_H

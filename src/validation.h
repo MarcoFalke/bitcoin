@@ -1019,9 +1019,6 @@ public:
     }
 };
 
-/** Global variable that points to the active block tree (protected by cs_main) */
-extern std::unique_ptr<CBlockTreeDB> pblocktree;
-
 extern VersionBitsCache versionbitscache;
 
 /**

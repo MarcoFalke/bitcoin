@@ -20,6 +20,8 @@
 #include <util/system.h>
 #include <validation.h>
 
+std::unique_ptr<CBlockTreeDB> pblocktree;
+
 std::atomic_bool fImporting(false);
 std::atomic_bool fReindex(false);
 bool fHavePruned = false;
