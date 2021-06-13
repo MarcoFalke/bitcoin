@@ -160,6 +160,63 @@ bool CBlockTreeDB::LoadBlockIndexGuts(const Consensus::Params& consensusParams, 
     return true;
 }
 
+bool LoadBlockIndexDB(BlockManager& blockman,
+                      std::set<CBlockIndex*, CBlockIndexWorkComparator>& block_index_candidates,
+                      const CChainParams& chainparams)
+{
+    if (!blockman.LoadBlockIndex(
+            chainparams.GetConsensus(), *pblocktree,
+            block_index_candidates)) {
+        return false;
+    }
+
+    // Load block file info
+    pblocktree->ReadLastBlockFile(nLastBlockFile);
+    vinfoBlockFile.resize(nLastBlockFile + 1);
+    LogPrintf("%s: last block file = %i\n", __func__, nLastBlockFile);
+    for (int nFile = 0; nFile <= nLastBlockFile; nFile++) {
+        pblocktree->ReadBlockFileInfo(nFile, vinfoBlockFile[nFile]);
+    }
+    LogPrintf("%s: last block file info: %s\n", __func__, vinfoBlockFile[nLastBlockFile].ToString());
+    for (int nFile = nLastBlockFile + 1; true; nFile++) {
+        CBlockFileInfo info;
+        if (pblocktree->ReadBlockFileInfo(nFile, info)) {
+            vinfoBlockFile.push_back(info);
+        } else {
+            break;
+        }
+    }
+
+    // Check presence of blk files
+    LogPrintf("Checking all blk files are present...\n");
+    std::set<int> setBlkDataFiles;
+    for (const std::pair<const uint256, CBlockIndex*>& item : blockman.m_block_index) {
+        CBlockIndex* pindex = item.second;
+        if (pindex->nStatus & BLOCK_HAVE_DATA) {
+            setBlkDataFiles.insert(pindex->nFile);
+        }
+    }
+    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
+    {
+        FlatFilePos pos(*it, 0);
+        if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
+            return false;
+        }
+    }
+
+    // Check whether we have ever pruned block & undo files
+    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
+    if (fHavePruned)
+        LogPrintf("LoadBlockIndexDB(): Block files have previously been pruned\n");
+
+    // Check whether we need to continue reindexing
+    bool fReindexing = false;
+    pblocktree->ReadReindexing(fReindexing);
+    if(fReindexing) fReindex = true;
+
+    return true;
+}
+
 // If we're using -prune with -reindex, then delete block files that will be ignored by the
 // reindex.  Since reindexing works by starting at block file 0 and looping until a blockfile
 // is missing, do the same here to delete any later block files after a gap.  Also delete all

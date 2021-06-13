@@ -3793,61 +3793,6 @@ void BlockManager::Unload() {
     m_block_index.clear();
 }
 
-bool CChainState::LoadBlockIndexDB()
-{
-    if (!m_blockman.LoadBlockIndex(
-            m_params.GetConsensus(), *pblocktree,
-            setBlockIndexCandidates)) {
-        return false;
-    }
-
-    // Load block file info
-    pblocktree->ReadLastBlockFile(nLastBlockFile);
-    vinfoBlockFile.resize(nLastBlockFile + 1);
-    LogPrintf("%s: last block file = %i\n", __func__, nLastBlockFile);
-    for (int nFile = 0; nFile <= nLastBlockFile; nFile++) {
-        pblocktree->ReadBlockFileInfo(nFile, vinfoBlockFile[nFile]);
-    }
-    LogPrintf("%s: last block file info: %s\n", __func__, vinfoBlockFile[nLastBlockFile].ToString());
-    for (int nFile = nLastBlockFile + 1; true; nFile++) {
-        CBlockFileInfo info;
-        if (pblocktree->ReadBlockFileInfo(nFile, info)) {
-            vinfoBlockFile.push_back(info);
-        } else {
-            break;
-        }
-    }
-
-    // Check presence of blk files
-    LogPrintf("Checking all blk files are present...\n");
-    std::set<int> setBlkDataFiles;
-    for (const std::pair<const uint256, CBlockIndex*>& item : m_blockman.m_block_index) {
-        CBlockIndex* pindex = item.second;
-        if (pindex->nStatus & BLOCK_HAVE_DATA) {
-            setBlkDataFiles.insert(pindex->nFile);
-        }
-    }
-    for (std::set<int>::iterator it = setBlkDataFiles.begin(); it != setBlkDataFiles.end(); it++)
-    {
-        FlatFilePos pos(*it, 0);
-        if (CAutoFile(OpenBlockFile(pos, true), SER_DISK, CLIENT_VERSION).IsNull()) {
-            return false;
-        }
-    }
-
-    // Check whether we have ever pruned block & undo files
-    pblocktree->ReadFlag("prunedblockfiles", fHavePruned);
-    if (fHavePruned)
-        LogPrintf("LoadBlockIndexDB(): Block files have previously been pruned\n");
-
-    // Check whether we need to continue reindexing
-    bool fReindexing = false;
-    pblocktree->ReadReindexing(fReindexing);
-    if(fReindexing) fReindex = true;
-
-    return true;
-}
-
 void CChainState::LoadMempool(const ArgsManager& args)
 {
     if (args.GetArg("-persistmempool", DEFAULT_PERSIST_MEMPOOL)) {
@@ -4143,7 +4088,7 @@ bool ChainstateManager::LoadBlockIndex()
     // Load block index from databases
     bool needs_init = fReindex;
     if (!fReindex) {
-        bool ret = ActiveChainstate().LoadBlockIndexDB();
+        bool ret = LoadBlockIndexDB(m_blockman, ActiveChainstate().setBlockIndexCandidates, ::Params());
         if (!ret) return false;
         needs_init = m_blockman.m_block_index.empty();
     }

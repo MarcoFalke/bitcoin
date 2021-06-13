@@ -7,6 +7,7 @@
 
 #include <fs.h>
 #include <protocol.h> // For CMessageHeader::MessageStartChars
+#include <sync.h>
 #include <util/check.h>
 
 #include <atomic>
@@ -14,6 +15,7 @@
 #include <vector>
 
 class ArgsManager;
+class BlockManager;
 class BlockValidationState;
 class CBlock;
 class CBlockFileInfo;
@@ -23,6 +25,7 @@ class CChain;
 class CChainParams;
 class CDBWrapper;
 class ChainstateManager;
+struct CBlockIndexWorkComparator;
 struct FlatFilePos;
 namespace Consensus {
 struct Params;
@@ -47,6 +50,8 @@ extern bool fPruneMode;
 /** Number of MiB of block files that we're trying to stay below. */
 extern uint64_t nPruneTarget;
 
+extern RecursiveMutex cs_main;
+
 /** Access to the block database (blocks/index/) */
 class CBlockTreeDB
 {
@@ -66,6 +71,10 @@ public:
     bool ReadFlag(const std::string& name, bool& fValue);
     bool LoadBlockIndexGuts(const Consensus::Params& consensusParams, std::function<CBlockIndex*(const uint256&)> insertBlockIndex);
 };
+
+bool LoadBlockIndexDB(BlockManager& blockman,
+                      std::set<CBlockIndex*, CBlockIndexWorkComparator>& block_index_candidates,
+                      const CChainParams& chainparams) EXCLUSIVE_LOCKS_REQUIRED(cs_main);
 
 //! Check whether the block associated with this index entry is pruned or not.
 bool IsBlockPruned(const CBlockIndex* pblockindex);
